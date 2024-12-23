@@ -1,0 +1,245 @@
+/**
+* @file practice.c
+* @author Ляхов М.В., гр. 515а, варіант 8
+* @date 2024
+* @brief Навчальна практика
+*
+* База даних товарів
+*/
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <locale.h>
+#include <ctype.h>
+
+#define _CRT_SECURE_NO_WARNINGS
+
+typedef struct Product {
+    int code;
+    char name[50];
+    float price;
+    int quantity;
+    struct Product* next;
+} Product;
+
+Product* head = NULL;
+
+void addProduct();
+void viewProducts();
+void searchByName();
+void searchByPriceRange();
+void saveToFile(const char* filename);
+void loadFromFile(const char* filename);
+void clearScreen();  // Функція для очистки екрана
+
+int main() {
+    setlocale(LC_ALL, "Russian");
+    system("chcp 65001 > nul"); // Установка UTF-8 для консолі
+    int choice;
+    const char* db_file = "products.dat";
+    loadFromFile(db_file);
+
+    while (1) {
+        clearScreen();  // Очищаємо екран перед виводенням меню
+        printf("\nМеню:\n");
+        printf("1. Додати товар\n");
+        printf("2. Продивитись усі товари\n");
+        printf("3. Пошук за назвою товару\n");
+        printf("4. Пошук за діапазоном цін\n");
+        printf("5. Вихід\n");
+        printf("Виберіть опцію: ");
+        scanf_s("%d", &choice);
+
+        switch (choice) {
+        case 1:
+            addProduct();
+            break;
+        case 2:
+            viewProducts();
+            break;
+        case 3:
+            searchByName();
+            break;
+        case 4:
+            searchByPriceRange();
+            break;
+        case 5:
+            saveToFile(db_file); // Зберігаємо дані перед виходом
+            printf("Вихід з програми...\n");
+            exit(0);
+        default:
+            printf("Помилковий вибір!\n");
+            break;
+        }
+    }
+    return 0;
+}
+
+void clearScreen() {
+#ifdef _WIN32
+    system("cls");  // Очищення екрана для Windows
+#else
+    system("clear");  // Очищення екрана для Linux/Mac
+#endif
+}
+
+void addProduct() {
+    Product* newProduct = (Product*)malloc(sizeof(Product));
+    if (!newProduct) {
+        printf("Помилка виділення пам'яті!\n");
+        return;
+    }
+
+    // Ініціалізація значень за замовчуванням
+    newProduct->code = 0;
+    newProduct->price = 0.0;
+    newProduct->quantity = 0;
+    memset(newProduct->name, 0, sizeof(newProduct->name));
+
+    printf("Введіть код товару: ");
+    scanf_s("%d", &newProduct->code);
+    getchar();  // Очищення залишкового символу нового рядка після виведення числа
+
+    printf("Введіть назву товару: ");
+    scanf_s(" %49[^\n]", newProduct->name, (unsigned)_countof(newProduct->name));  // безпечне введення рядка
+
+    printf("Введіть ціну товару (наприклад, 10.99): ");
+    scanf_s("%f", &newProduct->price);
+    getchar();  // Очищення залишкового символу нового рядка після введення числа
+
+    printf("Введіть кількість товару: ");
+    while (scanf_s("%d", &newProduct->quantity) != 1) {
+        // Якщо введено некоректне значення, повторіть введення
+        printf("ERROR: введіть ціле число для кількості товару: ");
+        while (getchar() != '\n');  // Очистка буфера
+    }
+
+    // Перевірка, щоб кількість товару було додатнім
+    if (newProduct->quantity < 0) {
+        printf("ERROR: кількість товару не може бути від'ємним. Встановлена кількість = 0.\n");
+        newProduct->quantity = 0;  // ініціалізуємо кількість товару як 0
+    }
+
+    // Виведення даних перед доданням
+    printf("Додаємо товар: Код: %d, Назва: %s, Ціна: %.2f, Кількість: %d\n", newProduct->code, newProduct->name, newProduct->price, newProduct->quantity);
+
+    newProduct->next = head;
+    head = newProduct;
+    printf("Товар додано!\n");
+
+    // Пауза перед возвратом в меню
+    getchar();  // Читання зайвого символа нового рядка
+    getchar();  // Очікування нажаття клавіші
+}
+
+void viewProducts() {
+    Product* temp = head;
+    if (!temp) {
+        printf("Список товарів порожній!\n");
+        return;
+    }
+
+    printf("\nСписок товарів:\n");
+    while (temp) {
+        printf("Код: %d, Назва: %s, Цена: %.2f, Кількість: %d\n", temp->code, temp->name, temp->price, temp->quantity);
+        temp = temp->next;
+    }
+
+    // Пауза перед поверненням в меню
+    getchar();  // Читання зайвого символу нового рядка
+    getchar();  // Очікування нажаття клавіші
+}
+
+void searchByName() {
+    char searchName[50];
+    printf("Введіть назву товару для пошуку: ");
+    scanf_s("%s", searchName, (unsigned)_countof(searchName));
+
+    // Перетворюємо введений рядок і всі товарні назви в нижній регістр для пошуку без учета регістру
+    for (int i = 0; searchName[i]; i++) {
+        searchName[i] = tolower(searchName[i]);
+    }
+
+    Product* temp = head;
+    int found = 0;
+    while (temp) {
+        char productName[50];
+        strcpy_s(productName, sizeof(productName), temp->name);
+
+        // Перетворюємо назву товару в нижній регістр
+        for (int i = 0; productName[i]; i++) {
+            productName[i] = tolower(productName[i]);
+        }
+
+        // Пошук підрядка
+        if (strstr(productName, searchName)) {
+            printf("Код: %d, Назва: %s, Ціна: %.2f, Кількість: %d\n", temp->code, temp->name, temp->price, temp->quantity);
+            found = 1;
+        }
+        temp = temp->next;
+    }
+    if (!found) printf("Товару з такою назвою не знайдено!\n");
+
+    // Пауза перед поверненням в меню
+    getchar();  // Читання зайвого символа нового рядка
+    getchar();  // Очікування нажаття клавіші
+}
+
+void searchByPriceRange() {
+    float minPrice, maxPrice;
+    printf("Введіть мінімальну ціну: ");
+    scanf_s("%f", &minPrice);
+    printf("Введіть максимальну ціну: ");
+    scanf_s("%f", &maxPrice);
+
+    Product* temp = head;
+    int found = 0;
+    while (temp) {
+        if (temp->price >= minPrice && temp->price <= maxPrice) {
+            printf("Код: %d, Назва: %s, Ціна: %.2f, Кількість: %d\n", temp->code, temp->name, temp->price, temp->quantity);
+            found = 1;
+        }
+        temp = temp->next;
+    }
+    if (!found) printf("Товари відсутні в заданому діапазоні цін!\n");
+
+    // Пауза перед поверненням в меню
+    getchar();  // Читання зайвого символа нового рядка
+    getchar();  // Очікування натиснення клавіші
+}
+
+void saveToFile(const char* filename) {
+    FILE* file = fopen(filename, "wb");
+    if (!file) {
+        printf("Помилка відкриття файлу для запису!\n");
+        return;
+    }
+
+    Product* temp = head;
+    while (temp) {
+        // Записуємо структуру без вказівника next
+        fwrite(temp, sizeof(Product) - sizeof(Product*), 1, file);
+        temp = temp->next;
+    }
+    fclose(file);
+    printf("Дані збережено в файл.\n");
+}
+
+void loadFromFile(const char* filename) {
+    FILE* file = fopen(filename, "rb");
+    if (!file) return;
+
+    Product temp;
+    while (fread(&temp, sizeof(Product) - sizeof(Product*), 1, file)) {
+        Product* newProduct = (Product*)malloc(sizeof(Product));
+        if (!newProduct) {
+            printf("Помилка виділення пам'яті!\n");
+            return;
+        }
+
+        *newProduct = temp;
+        newProduct->next = head;
+        head = newProduct;
+    }
+    fclose(file);
+}
